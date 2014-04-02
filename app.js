@@ -4,7 +4,7 @@
  */
 var serialport = require("serialport");
 var SerialPort = serialport.SerialPort;
-var redisClient = require('redis').createClient();
+//var redisClient = require('redis').createClient();
 var exec = require('child_process').exec;
 var messages = require('./scripts/text').messages;
 var fortunes = require('./scripts/text').fortunes;

@@ -10,7 +10,6 @@
     "ejs": "*",
     "less-middleware": "*",
     "serialport": "1.x",
-    "redis": "*",
     "socket.io": "0.9.x"
 
   }
