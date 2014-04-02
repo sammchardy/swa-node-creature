@@ -6,14 +6,15 @@ var serialport = require("serialport");
 var SerialPort = serialport.SerialPort;
 //var redisClient = require('redis').createClient();
 var exec = require('child_process').exec;
-var messages = require('./scripts/text').messages;
 var fortunes = require('./scripts/text').fortunes;
+var comPort = '/dev/cu.usbmodem411';
 
 var express = require('express')
   , http = require('http')
   , path = require('path');
 
 var app = express();
+var idleTimer = null;
 
 app.configure(function(){
   app.set('port', process.env.PORT || 3000);
@@ -24,7 +25,7 @@ app.configure(function(){
   app.use(express.bodyParser());
   app.use(express.methodOverride());
   app.use(app.router);
-  app.use(require('less-middleware')({ src: __dirname + '/public' }));
+  app.use(require('less-middleware')(__dirname + '/public'));
   app.use(express.static(path.join(__dirname, 'public')));
 });
 
@@ -34,9 +35,6 @@ app.configure('development', function(){
 
 app.get('/', function(req, res){
     res.render('index', { title: 'Save Bubbles' });
-});
-app.get('/message', function(req, res){
-    res.json({message: messages[Math.round(Math.random() * (messages.length - 1))]});
 });
 
 var appServer = http.createServer(app);
@@ -59,31 +57,40 @@ io.sockets.on('connection', function (socket) {
  *  Serial port communication
  *
  */
-var comPort = '/dev/tty.usbmodem1421';
 
 var sp = new SerialPort(comPort, {
-  baudrate: 38400
+  baudrate: 9600
   , parser: serialport.parsers.readline("\n")
 });
 
 var currentlySaying = false;
 sp.on("data", function (data) {
     var d = new Date();
-    console.log(d.toLocaleString() + " serialData: "+data);
-    if (data == 1) {
+    console.log(d.toLocaleString() + " serialData:"+data+':');
+    if (data.toString().trim() == "Show fortune") {
+        console.log('showing fortune');
         if (!currentlySaying) {
             currentlySaying = true;
             var fortune = fortunes[Math.round(Math.random() * (fortunes.length - 1))];
-            var cmd = 'say -v Bubbles ' + fortune;
-            console.log('running:' + cmd);
-            exec(
-                cmd
-              , function (error, stdout, stderr) {
-                    currentlySaying = false;
-                }
-            );
             io.sockets.emit('fortune', {fortune: fortune});
+            // schedule fortune to be said once the fortune is being typed
+            setTimeout(function() {
+                var cmd = 'say -v Bubbles "' + fortune +'"';
+                console.log('running:' + cmd);
+                exec(
+                    cmd
+                  , function (error, stdout, stderr) {
+                        currentlySaying = false;
+                    }
+                );  
+            }, 5000);
+            clearTimeout(idleTimer)
+            idleTimer = setTimeout(function() {
+                var cmd = 'say -v Bubbles Is there anybody out there?';
+            }, 300000);
         }
+    } else {
+        console.log('not showing fortune');
     }
 });
 
@@ -92,7 +99,7 @@ sp.on("data", function (data) {
  List the serial ports available
  */
 /*
-SerialPort.list(function (err, ports) {
+serialport.list(function (err, ports) {
     ports.forEach(function(port) {
       console.log(port.comName);
       console.log(port.pnpId);
